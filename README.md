@@ -58,11 +58,17 @@ Deploy to multiple GPUs in parallel:
 uv run runpod-build deploy n6m0htekvq "NVIDIA GeForce RTX 4090,NVIDIA RTX A5000" --max-workers 5
 ```
 
+Deploy with a custom sentinel file (e.g., the actual build artifact):
+```bash
+uv run runpod-build deploy n6m0htekvq "NVIDIA GeForce RTX 4090" --sentinel path/to/build_artifact
+```
+
 ### Options
 
 - `--volume-size`: Size of the temporary network volume (default: 10GB).
 - `--output-path`: Local directory to save extracted results (default: `./results`).
 - `--max-workers`: Maximum concurrent deployments (default: 5).
+- `--sentinel`: Name of the file the container creates to signal completion (default: `DONE`).
 
 ## Development
 
@@ -95,7 +101,7 @@ def test_something(mock_post):
 
 ## Container Workflow
 
-To reliably detect when your build has finished and artifacts are ready, this tool requires a **sentinel file** (default: `DONE`) to be created in the output directory of your pod.
+To reliably detect when your build has finished and artifacts are ready, this tool requires a **sentinel file** (default: `DONE`) to be created in the output directory of your pod. You can customize this filename using the `--sentinel` flag.
 
 The tool will poll S3 for this file, download all contents of the output directory, and then **immediately terminate the pod** to prevent billing or unexpected restarts.
 
