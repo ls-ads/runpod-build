@@ -13,7 +13,7 @@ A powerful CLI tool to deploy RunPod templates to specific GPUs with automatic d
 
 - [uv](https://github.com/astral-sh/uv)
 - RunPod API Key
-- AWS S3 Credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). These are used to access the S3-compatible API of your RunPod network volumes.
+- AWS S3 Credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). These are **provided by RunPod** for your account (find them in the RunPod console under Settings > S3 Settings). These are used to access the S3-compatible API of your RunPod network volumes.
 
 ## Setup
 
@@ -111,6 +111,16 @@ def test_something(mock_post):
 The tool jumps directly to polling S3 for this file after pod creation. It no longer waits for a specific pod status (like `RUNNING`), but it will continuously verify that the pod still exists. If the pod is deleted or disappears, the tool will automatically clean up the resources and exit.
 
 Once the sentinel is found, the tool downloads all contents of the output directory and then **immediately terminates the pod** to prevent billing or unexpected restarts.
+
+### Output Structure
+
+Results are saved to your `--output-path` (default: `./results`) using a descriptive subfolder naming scheme:
+
+```
+{output-path}/{template_id}-{sanitized_gpu}-{timestamp}/
+```
+
+For example: `results/qn96ymnjpd-nvidia-rtx-a4500-1708871234/`. This makes it easy to track artifacts for specific GPU builds and templates.
 
 ### Bash Example
 
