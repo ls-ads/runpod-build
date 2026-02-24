@@ -2,8 +2,8 @@ import concurrent.futures
 import uuid
 import os
 from typing import List, Dict
-from runpod_manager import RunPodManager
-from s3_manager import S3Manager
+from .runpod_manager import RunPodManager
+from .s3_manager import S3Manager
 
 class DeploymentOrchestrator:
     def __init__(

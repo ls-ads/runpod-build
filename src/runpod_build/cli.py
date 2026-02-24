@@ -1,9 +1,9 @@
 import click
 import os
 from dotenv import load_dotenv
-from runpod_manager import RunPodManager
-from s3_manager import S3Manager
-from orchestrator import DeploymentOrchestrator
+from .runpod_manager import RunPodManager
+from .s3_manager import S3Manager
+from .orchestrator import DeploymentOrchestrator
 
 @click.group()
 def main():
