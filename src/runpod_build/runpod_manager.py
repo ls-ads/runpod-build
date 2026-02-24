@@ -95,24 +95,35 @@ class RunPodManager:
         if response.status_code != 204:
             raise Exception(f"Failed to delete endpoint: {response.status_code} - {response.text}")
 
-    def wait_for_pod(self, pod_id: str, timeout: int = 600) -> str:
-        """Waits for pod to be running and returns its status."""
+    def wait_for_pod(self, pod_id: str, timeout: int = 1800) -> str:
+        """Waits for pod to be running or finished and returns its status."""
+        url = f"{self.base_url}/pods/{pod_id}"
         start_time = time.time()
         while time.time() - start_time < timeout:
-            pod = runpod.get_pod(pod_id)
-            status = pod.get("status")
-            if status == "RUNNING":
-                return "RUNNING"
-            if status == "EXITED":
-                return "EXITED"
-            time.sleep(10)
+            response = requests.get(url, headers=self._get_headers())
+            if response.status_code == 200:
+                pod = response.json()
+                status = pod.get("status")
+                # Any state that means the pod is/was running
+                if status in ["RUNNING", "COMPLETED"]:
+                    return "RUNNING"
+                if status in ["EXITED", "TERMINATED"]:
+                    return status
+            elif response.status_code == 404:
+                return "NOT_FOUND"
+                
+            time.sleep(5)
         return "TIMEOUT"
 
     def stop_pod(self, pod_id: str):
         runpod.stop_pod(pod_id)
 
     def terminate_pod(self, pod_id: str):
-        runpod.terminate_pod(pod_id)
+        """Terminates a pod via REST API."""
+        url = f"{self.base_url}/pods/{pod_id}"
+        response = requests.delete(url, headers=self._get_headers())
+        if response.status_code not in [200, 204]:
+            print(f"Warning: Failed to terminate pod {pod_id}: {response.status_code} - {response.text}")
 
     def delete_volume(self, volume_id: str):
         """Deletes a network volume via REST API."""
