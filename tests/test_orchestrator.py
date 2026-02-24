@@ -15,9 +15,9 @@ def orchestrator():
 def test_deploy_single_sentinel(mock_sleep, mock_uuid, orchestrator):
     # Setup mocks
     mock_uuid.return_value = uuid.UUID('12345678-1234-5678-1234-567812345678')    # Mock RunPodManager methods
-    orchestrator.runpod_mgr.get_gpu_region.return_value = "US-NORD"
+    orchestrator.runpod_mgr.get_gpu_region.return_value = "EU-RO-1"
     orchestrator.runpod_mgr.create_network_volume.return_value = "vol-123"
-    orchestrator.runpod_mgr.get_s3_endpoint.return_value = "https://s3api-us-nord.runpod.io/"
+    orchestrator.runpod_mgr.get_s3_endpoint.return_value = "https://s3api-eu-ro-1.runpod.io/"
     orchestrator.runpod_mgr.create_pod_with_template.return_value = {"id": "pod-123"}
     orchestrator.runpod_mgr.wait_for_pod.return_value = "RUNNING"
     orchestrator.s3_mgr.object_exists.return_value = True
@@ -33,10 +33,10 @@ def test_deploy_single_sentinel(mock_sleep, mock_uuid, orchestrator):
     # Verify
     assert result["status"] == "SUCCESS"
     orchestrator.s3_mgr.object_exists.assert_called_with(
-        "https://s3api-us-nord.runpod.io/", "vol-123", "DONE"
+        "https://s3api-eu-ro-1.runpod.io/", "vol-123", "DONE"
     )
     orchestrator.s3_mgr.download_directory.assert_called_once_with(
-        "https://s3api-us-nord.runpod.io/", "vol-123", "", "/tmp/results/12345678"
+        "https://s3api-eu-ro-1.runpod.io/", "vol-123", "", "/tmp/results/12345678"
     )
     
     # Verify sequential deployment

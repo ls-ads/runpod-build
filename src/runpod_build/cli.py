@@ -18,7 +18,8 @@ def main():
 @click.option('--output-path', default='./results', help='Local path to save results.')
 @click.option('--max-workers', default=5, help='Max parallel deployments.')
 @click.option("--sentinel", default="DONE", help="Sentinel file to signal build completion. The build container MUST create this file in the output directory once finished to signal completion.")
-def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, sentinel):
+@click.option("--region", help="RunPod data center ID (e.g., EU-RO-1, US-CA-2). If not provided, will default to EU-RO-1.")
+def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, sentinel, region):
     """
     Deploy a RunPod template to target GPUs and extract results.
     GPU_IDS can be a single ID or a comma-separated list.
@@ -56,7 +57,7 @@ def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, sentinel
     orchestrator = DeploymentOrchestrator(rp_mgr, s3_mgr, max_workers=max_workers)
     
     click.echo(f"Starting deployment for template {template_id} on GPUs: {gpu_list}")
-    results = orchestrator.run_parallel(template_id, gpu_list, volume_size, output_path, sentinel_filename=sentinel)
+    results = orchestrator.run_parallel(template_id, gpu_list, volume_size, output_path, sentinel_filename=sentinel, region=region)
     
     click.echo("\n--- Deployment Results ---")
     for res in results:

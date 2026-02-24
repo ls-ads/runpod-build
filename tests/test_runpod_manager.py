@@ -10,6 +10,14 @@ def test_get_s3_endpoint(runpod_manager):
     assert runpod_manager.get_s3_endpoint("US-NORD") == "https://s3api-us-nord.runpod.io/"
     assert runpod_manager.get_s3_endpoint("EU_CZ_1") == "https://s3api-eu-cz-1.runpod.io/"
 
+def test_get_gpu_region(runpod_manager):
+    # Test default
+    assert runpod_manager.get_gpu_region("4090") == "EU-RO-1"
+    # Test override
+    assert runpod_manager.get_gpu_region("4090", region="US-CA-2") == "US-CA-2"
+    # Test invalid region warning (functionally returns the region regardless)
+    assert runpod_manager.get_gpu_region("4090", region="INVALID") == "INVALID"
+
 @patch("runpod_build.runpod_manager.requests.post")
 def test_create_network_volume(mock_post, runpod_manager):
     # Setup mock response

@@ -22,7 +22,8 @@ class DeploymentOrchestrator:
         gpu_id: str, 
         volume_size: int, 
         output_local_path: str,
-        sentinel_filename: str = "DONE"
+        sentinel_filename: str = "DONE",
+        region: str = None
     ) -> Dict:
         """Handles the full lifecycle for a single GPU deployment."""
         deployment_id = str(uuid.uuid4())[:8]
@@ -35,7 +36,7 @@ class DeploymentOrchestrator:
         
         try:
             # 1. Create Volume
-            region = self.runpod_mgr.get_gpu_region(gpu_id)
+            region = self.runpod_mgr.get_gpu_region(gpu_id, region)
             volume_id = self.runpod_mgr.create_network_volume(volume_name, volume_size, region)
             s3_endpoint = self.runpod_mgr.get_s3_endpoint(region)
             print(f"[{pod_name}] Created volume: {volume_id} in {region}")
@@ -109,7 +110,8 @@ class DeploymentOrchestrator:
         gpu_ids: List[str], 
         volume_size: int, 
         output_local_path: str,
-        sentinel_filename: str = "DONE"
+        sentinel_filename: str = "DONE",
+        region: str = None
     ):
         results = []
         actual_workers = min(len(gpu_ids), self.max_workers)
@@ -121,7 +123,8 @@ class DeploymentOrchestrator:
                     gpu_id, 
                     volume_size, 
                     output_local_path,
-                    sentinel_filename
+                    sentinel_filename,
+                    region
                 ): gpu_id for gpu_id in gpu_ids
             }
             for future in concurrent.futures.as_completed(future_to_gpu):
