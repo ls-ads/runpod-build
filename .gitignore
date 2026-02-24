@@ -36,4 +36,5 @@ Thumbs.db
 
 # RunPod tool specific
 outputs/
-results/
+results/*
+!results/README.md
