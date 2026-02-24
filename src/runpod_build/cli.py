@@ -18,7 +18,7 @@ def main():
 @click.option('--output-path', default='./results', help='Local path to save results.')
 @click.option('--max-workers', default=5, help='Max parallel deployments.')
 @click.option("--sentinel", default="DONE", help="Sentinel file to signal build completion. The build container MUST create this file in the output directory once finished to signal completion.")
-@click.option("--region", help="RunPod data center ID (e.g., EU-RO-1, US-CA-2). If not provided, will default to EU-RO-1.")
+@click.option("--region", help="Preferred RunPod data center ID (e.g., EU-RO-1). If provided, it tries this region first, then fails over to others.")
 @click.option("--timeout", type=int, help="Maximum time (in seconds) to wait for the sentinel file. If not provided, will poll indefinitely until the pod is deleted or the sentinel is found.")
 @click.option("--keep-failed", is_flag=True, help="Do not delete the pod or volume if the deployment fails. Useful for debugging.")
 def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, sentinel, region, timeout, keep_failed):

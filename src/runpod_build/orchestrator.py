@@ -46,29 +46,63 @@ class DeploymentOrchestrator:
         volume_id = None
         s3_endpoint = None
         
+        # 0. Get candidate regions
+        candidate_regions = self.runpod_mgr.get_candidate_regions(gpu_id, region)
+        
+        pod_id = None
+        volume_id = None
+        s3_endpoint = None
+        current_region = None
+        
+        last_error = "No regions available"
+        
+        for attempt_region in candidate_regions:
+            current_region = attempt_region
+            try:
+                # 1. Create Volume
+                # Note: We create a unique volume name per region attempt to avoid collisions
+                attempt_volume_name = f"{volume_name}-{current_region.lower()}"[:60]
+                volume_id = self.runpod_mgr.create_network_volume(attempt_volume_name, volume_size, current_region)
+                s3_endpoint = self.runpod_mgr.get_s3_endpoint(current_region)
+                print(f"[{pod_name}] [{current_region}] Attempting deployment. Volume: {volume_id}")
+
+                # Settle time
+                import time
+                time.sleep(5)
+
+                # 2. Create Pod
+                pod = self.runpod_mgr.create_pod_with_template(
+                    name=pod_name,
+                    template_id=template_id,
+                    gpu_id=gpu_id,
+                    volume_id=volume_id,
+                    region=current_region
+                )
+                pod_id = pod["id"]
+                print(f"[{pod_name}] [{current_region}] Success! Started pod: {pod_id}")
+                break # Exit region loop on success
+                
+            except Exception as e:
+                error_msg = str(e)
+                print(f"[{pod_name}] [{current_region}] Attempt failed: {error_msg}")
+                last_error = error_msg
+                
+                # Cleanup volume if it was created but pod failed
+                if volume_id:
+                    try:
+                        print(f"[{pod_name}] [{current_region}] Cleaning up volume {volume_id} before retry...")
+                        self.runpod_mgr.delete_volume(volume_id)
+                    except:
+                        pass
+                    volume_id = None
+                
+                # Continue to next region
+                continue
+        
+        if not pod_id:
+            return {"status": "FAILED", "gpu": gpu_id, "error": f"Failed in all attempted regions. Last error: {last_error}"}
+
         try:
-            # 1. Create Volume
-            region = self.runpod_mgr.get_gpu_region(gpu_id, region)
-            volume_id = self.runpod_mgr.create_network_volume(volume_name, volume_size, region)
-            s3_endpoint = self.runpod_mgr.get_s3_endpoint(region)
-            print(f"[{pod_name}] Created volume: {volume_id} in {region}")
-            print(f"[{pod_name}] S3 Endpoint: {s3_endpoint}")
-
-            # Settle time to ensure volume is fully registered in RunPod's backend
-            import time
-            time.sleep(5)
-
-            # 2. Create Pod
-            pod = self.runpod_mgr.create_pod_with_template(
-                name=pod_name,
-                template_id=template_id,
-                gpu_id=gpu_id,
-                volume_id=volume_id,
-                region=region
-            )
-            pod_id = pod["id"]
-            print(f"[{pod_name}] Started pod: {pod_id} on {gpu_id}")
-
             # 3. Poll S3 for sentinel file with pod exit check
             print(f"[{pod_name}] Waiting for sentinel file '{sentinel_filename}' in S3 volume {volume_id}...")
             found_sentinel = False
@@ -80,7 +114,7 @@ class DeploymentOrchestrator:
                     break
 
                 # Check for sentinel file
-                if self.s3_mgr.object_exists(s3_endpoint, volume_id, sentinel_filename, region_name=region):
+                if self.s3_mgr.object_exists(s3_endpoint, volume_id, sentinel_filename, region_name=current_region):
                     found_sentinel = True
                     break
                 
@@ -98,7 +132,7 @@ class DeploymentOrchestrator:
             print(f"[{pod_name}] Sentinel found! Downloading results to {output_local_path}...")
             # We use the deployment name (minus the build- prefix) as the subfolder
             local_dest = os.path.join(output_local_path, deployment_id)
-            self.s3_mgr.download_directory(s3_endpoint, volume_id, "", local_dest, region_name=region)
+            self.s3_mgr.download_directory(s3_endpoint, volume_id, "", local_dest, region_name=current_region)
             
             # 5. Cleanup S3 sentinel (optional but good practice)
             # self.s3_mgr.delete_prefix(s3_endpoint, volume_id, sentinel_filename, region_name=region)

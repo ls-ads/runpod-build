@@ -22,12 +22,12 @@ class RunPodManager:
             "Content-Type": "application/json"
         }
 
-    def get_gpu_region(self, gpu_id: str, region: str = None) -> str:
+    def get_candidate_regions(self, gpu_id: str, preferred_region: str = None) -> List[str]:
         """
-        Finds a region where the desired GPU is available.
-        Uses region if provided, otherwise defaults to EU-RO-1.
+        Returns an ordered list of candidate regions to attempt deployment.
+        If preferred_region is provided, it is placed first.
         """
-        valid_regions = [
+        all_regions = [
             "EU-RO-1", "CA-MTL-1", "EU-SE-1", "US-IL-1", "EUR-IS-1", "EU-CZ-1",
             "US-TX-3", "EUR-IS-2", "US-KS-2", "US-GA-2", "US-WA-1", "US-TX-1",
             "CA-MTL-3", "EU-NL-1", "US-TX-4", "US-CA-2", "US-NC-1", "OC-AU-1",
@@ -35,13 +35,14 @@ class RunPodManager:
             "US-KS-3", "US-GA-1"
         ]
         
-        if region:
-            if region not in valid_regions:
-                print(f"Warning: {region} is not in the list of standard RunPod data centers.")
-            return region
+        candidates = []
+        if preferred_region:
+            if preferred_region in all_regions:
+                all_regions.remove(preferred_region)
+            candidates.append(preferred_region)
             
-        # Default to EU-RO-1 which typically has high availability for GPUs like 4090
-        return "EU-RO-1"
+        candidates.extend(all_regions)
+        return candidates
 
     def create_network_volume(self, name: str, size_gb: int, region: str) -> str:
         """Creates a network volume via REST API."""
