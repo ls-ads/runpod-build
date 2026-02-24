@@ -28,9 +28,19 @@ class DeploymentOrchestrator:
         keep_failed: bool = False
     ) -> Dict:
         """Handles the full lifecycle for a single GPU deployment."""
-        deployment_id = str(uuid.uuid4())[:8]
-        pod_name = f"build-{deployment_id}"
-        volume_name = f"vol-{deployment_id}"
+        # Generate descriptive deployment ID
+        import re
+        import time
+        sanitized_gpu = re.sub(r'[^a-zA-Z0-9]', '-', gpu_id.lower())
+        sanitized_gpu = re.sub(r'-+', '-', sanitized_gpu).strip('-')
+        timestamp = int(time.time())
+        
+        deployment_id = f"{template_id}-{sanitized_gpu}-{timestamp}"
+        
+        # Pod/Volume names have limits in some systems, let's keep them reasonably bounded
+        # but keep the descriptive part if possible.
+        pod_name = f"build-{deployment_id}"[:60]
+        volume_name = f"vol-{deployment_id}"[:60]
         
         pod_id = None
         volume_id = None
