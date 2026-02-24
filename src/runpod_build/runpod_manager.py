@@ -53,7 +53,7 @@ class RunPodManager:
         }
         
         response = requests.post(url, json=payload, headers=self._get_headers())
-        if response.status_code != 200:
+        if response.status_code not in range(200, 300):
             raise Exception(f"Failed to create network volume: {response.status_code} - {response.text}")
             
         volume_data = response.json()
