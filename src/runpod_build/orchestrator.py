@@ -84,7 +84,9 @@ class DeploymentOrchestrator:
         output_local_path: str
     ):
         results = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+        # Ensure we don't create more workers than items in the list
+        actual_workers = min(len(gpu_ids), self.max_workers)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=actual_workers) as executor:
             future_to_gpu = {
                 executor.submit(
                     self.deploy_single, 
