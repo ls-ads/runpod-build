@@ -1,5 +1,6 @@
 import click
 import os
+import runpod
 from dotenv import load_dotenv
 from .runpod_manager import RunPodManager
 from .s3_manager import S3Manager
@@ -18,7 +19,8 @@ def main():
 @click.option('--max-workers', default=5, help='Max parallel deployments.')
 @click.option('--s3-bucket', envvar='S3_BUCKET_NAME', help='S3 bucket for extraction.')
 @click.option('--aws-region', envvar='AWS_REGION', default='us-east-1', help='AWS region.')
-def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, s3_bucket, aws_region):
+@click.option("--sentinel", default="DONE", help="Sentinel file to signal build completion. The build container MUST create this file in the output directory once finished to signal completion.")
+def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, s3_bucket, aws_region, sentinel):
     """
     Deploy a RunPod template to target GPUs and extract results.
     GPU_IDS can be a single ID or a comma-separated list.
@@ -55,7 +57,7 @@ def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, s3_bucke
     orchestrator = DeploymentOrchestrator(rp_mgr, s3_mgr, max_workers=max_workers)
     
     click.echo(f"Starting deployment for template {template_id} on GPUs: {gpu_list}")
-    results = orchestrator.run_parallel(template_id, gpu_list, volume_size, output_path)
+    results = orchestrator.run_parallel(template_id, gpu_list, volume_size, output_path, sentinel_filename=sentinel)
     
     click.echo("\n--- Deployment Results ---")
     for res in results:

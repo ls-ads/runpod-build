@@ -52,3 +52,13 @@ class S3Manager:
                 Bucket=self.bucket_name,
                 Delete={'Objects': objects_to_delete}
             )
+
+    def object_exists(self, key: str) -> bool:
+        """Checks if a specific object exists in the bucket."""
+        try:
+            self.s3.head_object(Bucket=self.bucket_name, Key=key)
+            return True
+        except ClientError as e:
+            if e.response['Error']['Code'] == "404":
+                return False
+            raise

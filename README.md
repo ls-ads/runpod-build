@@ -93,6 +93,38 @@ def test_something(mock_post):
     # Your test here
 ```
 
+## Container Workflow
+
+To reliably detect when your build has finished and artifacts are ready, this tool requires a **sentinel file** (default: `DONE`) to be created in the output directory of your pod.
+
+The tool will poll S3 for this file, download all contents of the output directory, and then **immediately terminate the pod** to prevent billing or unexpected restarts.
+
+### Bash Example
+
+In your build script or Dockerfile `CMD`:
+
+```bash
+# ... run build commands ...
+# e.g., gcc main.c -o /output/myapp
+
+# Signal completion
+touch /output/DONE
+```
+
+### Python Example
+
+```python
+import os
+
+# ... perform build ...
+with open("/output/myapp", "wb") as f:
+    f.write(data)
+
+# Signal completion
+with open("/output/DONE", "w") as f:
+    f.write("finished")
+```
+
 ## Cleanup
 
 The tool automatically deletes pods and network volumes once the task is complete or if an error occurs.

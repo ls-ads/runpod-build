@@ -21,26 +21,26 @@ class DeploymentOrchestrator:
         template_id: str, 
         gpu_id: str, 
         volume_size: int, 
-        output_local_path: str
+        output_local_path: str,
+        sentinel_filename: str = "DONE"
     ) -> Dict:
         """Handles the full lifecycle for a single GPU deployment."""
         deployment_id = str(uuid.uuid4())[:8]
         pod_name = f"build-{deployment_id}"
         volume_name = f"vol-{deployment_id}"
         s3_prefix = f"runpod-build/{deployment_id}/"
+        sentinel_key = f"{s3_prefix}{sentinel_filename}"
         
         pod_id = None
         volume_id = None
         
         try:
-            # 1. Create Volume (In practice, region selection is needed)
-            # For now, using a default region or querying for the GPU availability.
-            region = "US-NORD" # This should ideally be dynamic based on GPU
+            # 1. Create Volume
+            region = self.runpod_mgr.get_gpu_region(gpu_id)
             volume_id = self.runpod_mgr.create_network_volume(volume_name, volume_size, region)
             print(f"[{pod_name}] Created volume: {volume_id}")
 
             # 2. Create Pod
-            # Injecting AWS credentials and S3 target for the pod to use.
             pod = self.runpod_mgr.create_pod_with_template(
                 name=pod_name,
                 template_id=template_id,
@@ -50,13 +50,29 @@ class DeploymentOrchestrator:
             pod_id = pod["id"]
             print(f"[{pod_name}] Started pod: {pod_id} on {gpu_id}")
 
-            # 3. Wait for completion
+            # 3. Wait for pod to be RUNNING
+            print(f"[{pod_name}] Waiting for pod to reach RUNNING status...")
             status = self.runpod_mgr.wait_for_pod(pod_id)
-            print(f"[{pod_name}] Pod finished with status: {status}")
+            if status != "RUNNING":
+                raise Exception(f"Pod failed to start: {status}")
 
-            # 4. Extract from S3
-            # We assume the pod uploaded its /output to s3://bucket/runpod-build/<id>/
-            print(f"[{pod_name}] Downloading results from S3...")
+            # 4. Poll S3 for sentinel file
+            print(f"[{pod_name}] Waiting for sentinel file '{sentinel_filename}' in S3...")
+            import time
+            found_sentinel = False
+            timeout = 3600 # 1 hour
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                if self.s3_mgr.object_exists(sentinel_key):
+                    found_sentinel = True
+                    break
+                time.sleep(15)
+            
+            if not found_sentinel:
+                raise Exception(f"Timed out waiting for sentinel '{sentinel_filename}'")
+
+            # 5. Extract from S3
+            print(f"[{pod_name}] Sentinel found. Downloading results from S3...")
             self.s3_mgr.download_directory(s3_prefix, os.path.join(output_local_path, deployment_id))
             
             return {"status": "SUCCESS", "pod_id": pod_id, "gpu": gpu_id}
@@ -66,7 +82,7 @@ class DeploymentOrchestrator:
             return {"status": "FAILED", "gpu": gpu_id, "error": str(e)}
         
         finally:
-            # 5. Cleanup
+            # 6. Cleanup (Immediate termination)
             if pod_id:
                 print(f"[{pod_name}] Terminating pod...")
                 self.runpod_mgr.terminate_pod(pod_id)
@@ -81,10 +97,10 @@ class DeploymentOrchestrator:
         template_id: str, 
         gpu_ids: List[str], 
         volume_size: int, 
-        output_local_path: str
+        output_local_path: str,
+        sentinel_filename: str = "DONE"
     ):
         results = []
-        # Ensure we don't create more workers than items in the list
         actual_workers = min(len(gpu_ids), self.max_workers)
         with concurrent.futures.ThreadPoolExecutor(max_workers=actual_workers) as executor:
             future_to_gpu = {
@@ -93,7 +109,8 @@ class DeploymentOrchestrator:
                     template_id, 
                     gpu_id, 
                     volume_size, 
-                    output_local_path
+                    output_local_path,
+                    sentinel_filename
                 ): gpu_id for gpu_id in gpu_ids
             }
             for future in concurrent.futures.as_completed(future_to_gpu):
