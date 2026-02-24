@@ -64,6 +64,35 @@ uv run runpod-build deploy n6m0htekvq "NVIDIA GeForce RTX 4090,NVIDIA RTX A5000"
 - `--output-path`: Local directory to save extracted results (default: `./results`).
 - `--max-workers`: Maximum concurrent deployments (default: 5).
 
+## Development
+
+### Running Tests
+
+We use `pytest` for testing. To run the tests, use:
+
+```bash
+uv run pytest
+```
+
+To run a specific test file or with more verbose output:
+
+```bash
+uv run pytest tests/test_runpod_manager.py -v
+```
+
+### Adding New Tests
+
+New tests should be added to the `tests/` directory with the `test_*.py` naming convention. For tests involving external services (RunPod, S3), use `unittest.mock` to avoid side effects.
+
+Example:
+```python
+from unittest.mock import patch
+
+@patch("runpod_build.runpod_manager.requests.post")
+def test_something(mock_post):
+    # Your test here
+```
+
 ## Cleanup
 
 The tool automatically deletes pods and network volumes once the task is complete or if an error occurs.

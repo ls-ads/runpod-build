@@ -1,5 +1,6 @@
 import os
 import time
+import requests
 import runpod
 from typing import List, Optional, Dict
 
@@ -7,38 +8,36 @@ class RunPodManager:
     def __init__(self, api_key: str):
         runpod.api_key = api_key
         self.api_key = api_key
+        self.base_url = "https://rest.runpod.io/v1"
+
+    def _get_headers(self) -> Dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
 
     def get_gpu_region(self, gpu_id: str) -> str:
         """
         Helper to find a region where the desired GPU is available.
-        Note: The RunPod SDK get_gpus() doesn't directly return region per GPU,
-        but we can infer or use the first available instance location.
-        For simplicity in this tool, we might try to create the pod and see where it lands,
-        but network volumes MUST be created in a specific region.
-        
-        Refined approach: Use runpod.get_gpus() and check locations if available, 
-        or use a default if not specified.
+        For now, returns US-NORD as a default.
         """
-        # This is a bit of a heuristic as the SDK doesn't make it trivial to map 
-        # a GPU ID to a region without a search.
-        return "US-NORD" # Placeholder - in practice, we'll need to query availability.
+        return "US-NORD"
 
     def create_network_volume(self, name: str, size_gb: int, region: str) -> str:
-        """Creates a network volume and returns its ID."""
-        # Note: Network volume creation might require GraphQL if not in SDK.
-        # Based on docs provided, create_template is there but volume creation is sparse.
-        # I'll use the documented API structure if possible.
-        # If the SDK doesn't have it, I'll use a placeholder and note it.
-        try:
-            volume = runpod.create_network_volume(
-                name=name,
-                size_gb=size_gb,
-                data_center_id=region
-            )
-            return volume["id"]
-        except Exception as e:
-            print(f"Error creating volume: {e}")
-            raise
+        """Creates a network volume via REST API."""
+        url = f"{self.base_url}/networkvolumes"
+        payload = {
+            "name": name,
+            "size": size_gb,
+            "dataCenterId": region
+        }
+        
+        response = requests.post(url, json=payload, headers=self._get_headers())
+        if response.status_code != 200:
+            raise Exception(f"Failed to create network volume: {response.status_code} - {response.text}")
+            
+        volume_data = response.json()
+        return volume_data["id"]
 
     def create_pod_with_template(
         self, 
@@ -83,5 +82,9 @@ class RunPodManager:
         runpod.terminate_pod(pod_id)
 
     def delete_volume(self, volume_id: str):
-        # Placeholder for volume deletion
-        pass
+        """Deletes a network volume via REST API."""
+        url = f"{self.base_url}/networkvolumes/{volume_id}"
+        response = requests.delete(url, headers=self._get_headers())
+        if response.status_code not in [200, 204]:
+            print(f"Warning: Failed to delete volume {volume_id}: {response.status_code} - {response.text}")
+
