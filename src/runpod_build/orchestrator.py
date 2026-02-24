@@ -28,17 +28,18 @@ class DeploymentOrchestrator:
         deployment_id = str(uuid.uuid4())[:8]
         pod_name = f"build-{deployment_id}"
         volume_name = f"vol-{deployment_id}"
-        s3_prefix = f"runpod-build/{deployment_id}/"
-        sentinel_key = f"{s3_prefix}{sentinel_filename}"
         
         pod_id = None
         volume_id = None
+        s3_endpoint = None
         
         try:
             # 1. Create Volume
             region = self.runpod_mgr.get_gpu_region(gpu_id)
             volume_id = self.runpod_mgr.create_network_volume(volume_name, volume_size, region)
+            s3_endpoint = self.runpod_mgr.get_s3_endpoint(region)
             print(f"[{pod_name}] Created volume: {volume_id} in {region}")
+            print(f"[{pod_name}] S3 Endpoint: {s3_endpoint}")
 
             # Settle time to ensure volume is fully registered in RunPod's backend
             import time
@@ -62,12 +63,12 @@ class DeploymentOrchestrator:
                 raise Exception(f"Pod failed to start: {status}")
 
             # 4. Poll S3 for sentinel file
-            print(f"[{pod_name}] Waiting for sentinel file '{sentinel_filename}' in S3...")
+            print(f"[{pod_name}] Waiting for sentinel file '{sentinel_filename}' in S3 volume {volume_id}...")
             found_sentinel = False
             timeout = 3600 # 1 hour
             start_time = time.time()
             while time.time() - start_time < timeout:
-                if self.s3_mgr.object_exists(sentinel_key):
+                if self.s3_mgr.object_exists(s3_endpoint, volume_id, sentinel_filename):
                     found_sentinel = True
                     break
                 time.sleep(15)
@@ -77,7 +78,8 @@ class DeploymentOrchestrator:
 
             # 5. Extract from S3
             print(f"[{pod_name}] Sentinel found. Downloading results from S3...")
-            self.s3_mgr.download_directory(s3_prefix, os.path.join(output_local_path, deployment_id))
+            # For network volumes as S3, the bucket root is the /output folder
+            self.s3_mgr.download_directory(s3_endpoint, volume_id, "", os.path.join(output_local_path, deployment_id))
             
             return {"status": "SUCCESS", "pod_id": pod_id, "gpu": gpu_id}
 
@@ -100,12 +102,6 @@ class DeploymentOrchestrator:
                     self.runpod_mgr.delete_volume(volume_id)
                 except Exception as e:
                     print(f"[{pod_name}] Failed to delete volume {volume_id}: {e}")
-                    
-            # Cleanup S3 transit data
-            try:
-                self.s3_mgr.delete_prefix(s3_prefix)
-            except Exception as e:
-                print(f"[{pod_name}] Failed to clean up S3 prefix {s3_prefix}: {e}")
 
     def run_parallel(
         self, 

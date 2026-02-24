@@ -10,6 +10,12 @@ class RunPodManager:
         self.api_key = api_key
         self.base_url = "https://rest.runpod.io/v1"
 
+    def get_s3_endpoint(self, region: str) -> str:
+        """Generates the S3-compatible API endpoint for a specific region."""
+        # e.g., US-NORD -> https://s3api-us-nord.runpod.io/
+        region_clean = region.lower().replace("_", "-")
+        return f"https://s3api-{region_clean}.runpod.io/"
+
     def _get_headers(self) -> Dict[str, str]:
         return {
             "Authorization": f"Bearer {self.api_key}",

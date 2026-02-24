@@ -6,6 +6,10 @@ from runpod_build.runpod_manager import RunPodManager
 def runpod_manager():
     return RunPodManager(api_key="test_key")
 
+def test_get_s3_endpoint(runpod_manager):
+    assert runpod_manager.get_s3_endpoint("US-NORD") == "https://s3api-us-nord.runpod.io/"
+    assert runpod_manager.get_s3_endpoint("EU_CZ_1") == "https://s3api-eu-cz-1.runpod.io/"
+
 @patch("runpod_build.runpod_manager.requests.post")
 def test_create_network_volume(mock_post, runpod_manager):
     # Setup mock response

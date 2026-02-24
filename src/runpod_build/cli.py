@@ -17,10 +17,8 @@ def main():
 @click.option('--volume-size', default=10, help='Size of the network volume in GB.')
 @click.option('--output-path', default='./results', help='Local path to save results.')
 @click.option('--max-workers', default=5, help='Max parallel deployments.')
-@click.option('--s3-bucket', envvar='S3_BUCKET_NAME', help='S3 bucket for extraction.')
-@click.option('--aws-region', envvar='AWS_REGION', default='us-east-1', help='AWS region.')
 @click.option("--sentinel", default="DONE", help="Sentinel file to signal build completion. The build container MUST create this file in the output directory once finished to signal completion.")
-def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, s3_bucket, aws_region, sentinel):
+def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, sentinel):
     """
     Deploy a RunPod template to target GPUs and extract results.
     GPU_IDS can be a single ID or a comma-separated list.
@@ -31,9 +29,10 @@ def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, s3_bucke
     aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
     aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
     
-    if not all([runpod_api_key, aws_access_key, aws_secret_key, s3_bucket]):
-        click.echo("Error: Missing required environment variables or --s3-bucket.")
-        click.echo("Check RUNPOD_API_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and S3_BUCKET_NAME.")
+    if not all([runpod_api_key, aws_access_key, aws_secret_key]):
+        click.echo("Error: Missing required environment variables.")
+        click.echo("Check RUNPOD_API_KEY, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY.")
+        click.echo("Note: S3 bucket and region are now automatically detected from your RunPod deployment.")
         return
 
     # Parse GPU list
@@ -41,7 +40,7 @@ def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, s3_bucke
     
     # Initialize Managers
     rp_mgr = RunPodManager(runpod_api_key)
-    s3_mgr = S3Manager(aws_access_key, aws_secret_key, aws_region, s3_bucket)
+    s3_mgr = S3Manager(aws_access_key, aws_secret_key)
     
     # Optional: Check account balance for worker limit suggestion
     try:

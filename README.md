@@ -13,7 +13,7 @@ A powerful CLI tool to deploy RunPod templates to specific GPUs with automatic d
 
 - [uv](https://github.com/astral-sh/uv)
 - RunPod API Key
-- AWS S3 Credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+- AWS S3 Credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). These are used to access the S3-compatible API of your RunPod network volumes.
 
 ## Setup
 
@@ -25,11 +25,11 @@ A powerful CLI tool to deploy RunPod templates to specific GPUs with automatic d
 3. Fill in your credentials:
    ```env
    RUNPOD_API_KEY=your_runpod_key
-   AWS_ACCESS_KEY_ID=your_aws_key
-   AWS_SECRET_ACCESS_KEY=your_aws_secret
-   AWS_REGION=us-east-1
-   S3_BUCKET_NAME=your_extraction_bucket
+   AWS_ACCESS_KEY_ID=your_runpod_user_id
+   AWS_SECRET_ACCESS_KEY=your_runpod_s3_secret
    ```
+
+*Note: S3 bucket names and endpoint URLs are now automatically detected from your RunPod deployment.*
 
 ## Usage
 
