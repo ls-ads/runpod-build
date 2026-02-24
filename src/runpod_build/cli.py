@@ -19,7 +19,9 @@ def main():
 @click.option('--max-workers', default=5, help='Max parallel deployments.')
 @click.option("--sentinel", default="DONE", help="Sentinel file to signal build completion. The build container MUST create this file in the output directory once finished to signal completion.")
 @click.option("--region", help="RunPod data center ID (e.g., EU-RO-1, US-CA-2). If not provided, will default to EU-RO-1.")
-def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, sentinel, region):
+@click.option("--timeout", type=int, help="Maximum time (in seconds) to wait for the sentinel file. If not provided, will poll indefinitely until the pod is deleted or the sentinel is found.")
+@click.option("--keep-failed", is_flag=True, help="Do not delete the pod or volume if the deployment fails. Useful for debugging.")
+def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, sentinel, region, timeout, keep_failed):
     """
     Deploy a RunPod template to target GPUs and extract results.
     GPU_IDS can be a single ID or a comma-separated list.
@@ -30,11 +32,23 @@ def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, sentinel
     aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
     aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
     
-    if not all([runpod_api_key, aws_access_key, aws_secret_key]):
-        click.echo("Error: Missing required environment variables.")
-        click.echo("Check RUNPOD_API_KEY, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY.")
-        click.echo("Note: S3 bucket and region are now automatically detected from your RunPod deployment.")
+    if not runpod_api_key:
+        click.echo("Error: Missing RUNPOD_API_KEY environment variable.")
         return
+
+    # Fallback for S3 credentials: RunPod Network Volumes as S3 use the API Key as both Access and Secret keys.
+    if not aws_access_key or aws_access_key.lower() == "none":
+        aws_access_key = runpod_api_key
+    
+    if not aws_secret_key or aws_secret_key.lower() == "none":
+        aws_secret_key = runpod_api_key
+
+    # Masked credential logging for verification
+    def mask(key):
+        if not key or len(key) < 8: return "****"
+        return f"{key[:4]}...{key[-4:]}"
+    
+    click.echo(f"[*] S3 Auth: AccessKey={mask(aws_access_key)}, SecretKey={mask(aws_secret_key)}")
 
     # Parse GPU list
     gpu_list = [g.strip() for g in gpu_ids.split(',')]
@@ -57,7 +71,7 @@ def deploy(template_id, gpu_ids, volume_size, output_path, max_workers, sentinel
     orchestrator = DeploymentOrchestrator(rp_mgr, s3_mgr, max_workers=max_workers)
     
     click.echo(f"Starting deployment for template {template_id} on GPUs: {gpu_list}")
-    results = orchestrator.run_parallel(template_id, gpu_list, volume_size, output_path, sentinel_filename=sentinel, region=region)
+    results = orchestrator.run_parallel(template_id, gpu_list, volume_size, output_path, sentinel_filename=sentinel, region=region, timeout=timeout, keep_failed=keep_failed)
     
     click.echo("\n--- Deployment Results ---")
     for res in results:

@@ -104,11 +104,24 @@ class RunPodManager:
             if response.status_code == 200:
                 pod = response.json()
                 status = pod.get("status")
-                # Any state that means the pod is/was running
-                if status in ["RUNNING", "COMPLETED"]:
+                desired_status = pod.get("desiredStatus")
+                runtime = pod.get("runtime", {})
+                uptime = runtime.get("uptimeInSeconds", 0) if runtime else 0
+                
+                # Debug print to help identify real status fields
+                print(f"[DEBUG] Pod {pod_id}: status={status}, desiredStatus={desired_status}, uptime={uptime}")
+
+                # High-confidence "running" if uptime is positive
+                if uptime > 0:
                     return "RUNNING"
-                if status in ["EXITED", "TERMINATED"]:
-                    return status
+                
+                # Fallback to status fields
+                if status in ["RUNNING", "COMPLETED"] or desired_status in ["RUNNING", "COMPLETED"]:
+                    return "RUNNING"
+                
+                if status in ["EXITED", "TERMINATED"] or desired_status in ["EXITED", "TERMINATED"]:
+                    # If it exited/terminated but never had uptime, it might have failed early
+                    return status or desired_status
             elif response.status_code == 404:
                 return "NOT_FOUND"
                 
