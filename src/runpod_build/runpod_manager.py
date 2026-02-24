@@ -45,22 +45,35 @@ class RunPodManager:
         template_id: str, 
         gpu_id: str, 
         volume_id: str, 
+        region: str,
         mount_path: str = "/output"
     ) -> Dict:
-        """Creates a pod using a template and attaches a network volume."""
-        try:
-            pod = runpod.create_pod(
-                name=name,
-                template_id=template_id,
-                gpu_type_id=gpu_id,
-                network_volume_id=volume_id,
-                volume_mount_path=mount_path,
-                gpu_count=1
-            )
-            return pod
-        except Exception as e:
-            print(f"Error creating pod: {e}")
-            raise
+        """Creates a pod via REST API with strict region and volume placement."""
+        url = f"{self.base_url}/pods"
+        payload = {
+            "name": name,
+            "templateId": template_id,
+            "gpuTypeIds": [gpu_id],
+            "gpuTypePriority": "custom",
+            "gpuCount": 1,
+            "networkVolumeId": volume_id,
+            "volumeMountPath": mount_path,
+            "dataCenterIds": [region],
+            "dataCenterPriority": "custom"
+        }
+        
+        response = requests.post(url, json=payload, headers=self._get_headers())
+        if response.status_code != 201:
+            raise Exception(f"Failed to create pod: {response.status_code} - {response.text}")
+            
+        return response.json()
+
+    def delete_endpoint(self, endpoint_id: str):
+        """Deletes a serverless endpoint."""
+        url = f"{self.base_url}/endpoints/{endpoint_id}"
+        response = requests.delete(url, headers=self._get_headers())
+        if response.status_code != 204:
+            raise Exception(f"Failed to delete endpoint: {response.status_code} - {response.text}")
 
     def wait_for_pod(self, pod_id: str, timeout: int = 600) -> str:
         """Waits for pod to be running and returns its status."""

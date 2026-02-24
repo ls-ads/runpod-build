@@ -38,14 +38,19 @@ class DeploymentOrchestrator:
             # 1. Create Volume
             region = self.runpod_mgr.get_gpu_region(gpu_id)
             volume_id = self.runpod_mgr.create_network_volume(volume_name, volume_size, region)
-            print(f"[{pod_name}] Created volume: {volume_id}")
+            print(f"[{pod_name}] Created volume: {volume_id} in {region}")
+
+            # Settle time to ensure volume is fully registered in RunPod's backend
+            import time
+            time.sleep(5)
 
             # 2. Create Pod
             pod = self.runpod_mgr.create_pod_with_template(
                 name=pod_name,
                 template_id=template_id,
                 gpu_id=gpu_id,
-                volume_id=volume_id
+                volume_id=volume_id,
+                region=region
             )
             pod_id = pod["id"]
             print(f"[{pod_name}] Started pod: {pod_id} on {gpu_id}")
@@ -58,7 +63,6 @@ class DeploymentOrchestrator:
 
             # 4. Poll S3 for sentinel file
             print(f"[{pod_name}] Waiting for sentinel file '{sentinel_filename}' in S3...")
-            import time
             found_sentinel = False
             timeout = 3600 # 1 hour
             start_time = time.time()
@@ -84,13 +88,24 @@ class DeploymentOrchestrator:
         finally:
             # 6. Cleanup (Immediate termination)
             if pod_id:
-                print(f"[{pod_name}] Terminating pod...")
-                self.runpod_mgr.terminate_pod(pod_id)
+                try:
+                    print(f"[{pod_name}] Terminating pod: {pod_id}")
+                    self.runpod_mgr.terminate_pod(pod_id)
+                except Exception as e:
+                    print(f"[{pod_name}] Failed to terminate pod {pod_id}: {e}")
+                    
             if volume_id:
-                print(f"[{pod_name}] Deleting volume...")
-                self.runpod_mgr.delete_volume(volume_id)
+                try:
+                    print(f"[{pod_name}] Deleting volume: {volume_id}")
+                    self.runpod_mgr.delete_volume(volume_id)
+                except Exception as e:
+                    print(f"[{pod_name}] Failed to delete volume {volume_id}: {e}")
+                    
             # Cleanup S3 transit data
-            self.s3_mgr.delete_prefix(s3_prefix)
+            try:
+                self.s3_mgr.delete_prefix(s3_prefix)
+            except Exception as e:
+                print(f"[{pod_name}] Failed to clean up S3 prefix {s3_prefix}: {e}")
 
     def run_parallel(
         self, 

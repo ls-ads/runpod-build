@@ -36,6 +36,13 @@ def test_deploy_single_sentinel(mock_sleep, mock_uuid, orchestrator):
     assert result["status"] == "SUCCESS"
     assert orchestrator.s3_mgr.object_exists.call_count == 2
     orchestrator.s3_mgr.download_directory.assert_called_once()
+    
+    # Verify sequential deployment
+    orchestrator.runpod_mgr.create_network_volume.assert_called_once()
+    assert mock_sleep.call_args_list[0][0][0] == 5
+    orchestrator.runpod_mgr.create_pod_with_template.assert_called_once()
+    
+    # Verify cleanup
     orchestrator.runpod_mgr.terminate_pod.assert_called_once_with("pod-123")
     orchestrator.runpod_mgr.delete_volume.assert_called_once_with("vol-123")
     orchestrator.s3_mgr.delete_prefix.assert_called_once()
